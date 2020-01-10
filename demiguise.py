@@ -10,8 +10,10 @@ import os
 import sys
 
 
+pathname = os.path.dirname(sys.argv[0])        
+
 # TODO: load *all* templates from template folder rather than hard-coding
-with open("templates/hta_template.txt") as f:
+with open(os.path.abspath(pathname) + "/templates/hta_template.txt") as f:
 	HTML_TEMPLATE = f.read()
 
 
@@ -64,7 +66,7 @@ self.close
 
 
 # Experimental XLL feature - only tested on Office 2016 (x64)
-with open("templates/xll_hta.txt") as f:
+with open(os.path.abspath(pathname) + "/templates/xll_hta.txt") as f:
 	XLL_HTA = f.read()
 
 
